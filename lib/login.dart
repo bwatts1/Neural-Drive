@@ -12,8 +12,17 @@ class Login extends StatelessWidget{
         title: const Text('Login'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-    body: Stack(
-
+      body: Stack(
+        children: [
+          Center(
+            child: ElevatedButton(
+              onPressed: (){
+                    Navigator.of(context).pushReplacementNamed('/home');
+              },
+              child: const Text('Login'),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -12,7 +12,16 @@ class SignUp extends StatelessWidget{
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
     body: Stack(
-
+        children: [
+          Center(
+            child: ElevatedButton(
+              onPressed: (){
+                    Navigator.of(context).pushNamed('/login');
+              },
+              child: const Text('finish Sign Up'),
+            ),
+          ),
+        ],
       ),
     );
   }
