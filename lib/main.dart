@@ -3,6 +3,11 @@ import 'login.dart';
 import 'signup.dart';
 import 'home_screen.dart';
 import 'splash.dart';
+import 'maintenance_log.dart';
+import 'profile_screen.dart';
+import 'reminder_screen.dart';
+import 'expense_screen.dart';
+import 'vehicle_screen.dart';
 
 void main() {
   runApp(const MyApp());
