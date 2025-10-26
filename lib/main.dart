@@ -23,12 +23,14 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      initialRoute: '/',
+      initialRoute: '/home',
       routes: {
         '/': (context) => const Splash(),
         '/login': (context) => const Login(),
         '/signUp': (context) => const SignUp(),
         '/home': (context) => const HomeScreen(),
+        '/maintenanceLog': (context) => const MaintenanceLog(),
+        '/profileScreen': (context) => const ProfileScreen(),
       },
     );
   }
