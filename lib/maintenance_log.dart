@@ -8,7 +8,7 @@ class MaintenanceLog extends StatelessWidget{
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HomeScreen'),
+        title: const Text('Maintenance Log'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Stack(
