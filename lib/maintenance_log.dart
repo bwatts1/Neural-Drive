@@ -26,7 +26,7 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
   void _updateStateWithReports(List<Map<String, dynamic>> reports) {
     double total = 0.0;
     for (var r in reports) {
-      total += (r['price'] ?? 0).toDouble();
+      total += double.tryParse(r['price'].toString()) ?? 0.0;
     }
     setState(() {
       _reports = reports;
@@ -36,7 +36,10 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
 
   Future<void> _addOrEditReport({Map<String, dynamic>? existing}) async {
     final nameController = TextEditingController(text: existing?['name']);
-    final dateController = TextEditingController(text: existing?['date']);
+    final dateController = TextEditingController(
+        text: existing?['date'] ?? DateTime.now().toIso8601String().split('T').first);
+    final reminderController = TextEditingController(
+        text: existing?['reminder'] ?? '');
     final priceController = TextEditingController(
         text: existing != null ? existing['price'].toString() : '');
 
@@ -45,30 +48,88 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
       builder: (_) {
         return AlertDialog(
           title: Text(existing == null ? "Add Report" : "Edit Report"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: "Name")),
-              TextField(controller: dateController, decoration: const InputDecoration(labelText: "Date")),
-              TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Price")),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: "Name"),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: dateController,
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: "Maintenance Date"),
+                  onTap: () async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.tryParse(dateController.text) ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      dateController.text = picked.toIso8601String().split('T').first;
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: reminderController,
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: "Reminder Date"),
+                  onTap: () async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.tryParse(reminderController.text) ??
+                          DateTime.now().add(const Duration(days: 7)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      reminderController.text = picked.toIso8601String().split('T').first;
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Price"),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () async {
                 final name = nameController.text.trim();
-                final date = dateController.text.trim().isNotEmpty ? dateController.text.trim() : DateTime.now().toIso8601String();
+                final date = dateController.text.trim();
+                final reminder = reminderController.text.trim();
                 final price = double.tryParse(priceController.text.trim());
 
-                if (name.isNotEmpty && price != null) {
-                  if (existing == null) {
-                    await DbHelper().insertReport({'name': name, 'date': date, 'price': price});
-                  } else {
-                    await DbHelper().updateReport(existing['id'], {'name': name, 'date': date, 'price': price});
-                  }
-                  Navigator.pop(context);
-                  _loadReports();
+                if (name.isEmpty || price == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please enter a valid name and price.")),
+                  );
+                  return;
                 }
+
+                final report = {
+                  'name': name,
+                  'date': date,
+                  'reminder': reminder,
+                  'price': price,
+                };
+
+                if (existing == null) {
+                  await DbHelper().insertReport(report);
+                } else {
+                  await DbHelper().updateReport(existing['id'], report);
+                }
+
+                if (context.mounted) Navigator.pop(context);
+                _loadReports();
               },
               child: Text(existing == null ? "Add" : "Update"),
             ),
@@ -93,11 +154,53 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
           content: SingleChildScrollView(
             child: Column(
               children: [
-                TextField(controller: keywordController, decoration: const InputDecoration(labelText: "Keyword")),
-                TextField(controller: minPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Min Price")),
-                TextField(controller: maxPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Max Price")),
-                TextField(controller: startDateController, decoration: const InputDecoration(labelText: "Start Date (YYYY-MM-DD)")),
-                TextField(controller: endDateController, decoration: const InputDecoration(labelText: "End Date (YYYY-MM-DD)")),
+                TextField(
+                    controller: keywordController,
+                    decoration: const InputDecoration(labelText: "Keyword")),
+                TextField(
+                    controller: minPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: "Min Price")),
+                TextField(
+                    controller: maxPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: "Max Price")),
+                TextField(
+                  controller: startDateController,
+                  readOnly: true,
+                  decoration:
+                      const InputDecoration(labelText: "Start Date (YYYY-MM-DD)"),
+                  onTap: () async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      startDateController.text =
+                          picked.toIso8601String().split('T').first;
+                    }
+                  },
+                ),
+                TextField(
+                  controller: endDateController,
+                  readOnly: true,
+                  decoration:
+                      const InputDecoration(labelText: "End Date (YYYY-MM-DD)"),
+                  onTap: () async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      endDateController.text =
+                          picked.toIso8601String().split('T').first;
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -111,7 +214,7 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                   startDate: startDateController.text.trim(),
                   endDate: endDateController.text.trim(),
                 );
-                Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
                 _updateStateWithReports(filtered);
               },
               child: const Text("Apply"),
@@ -142,11 +245,35 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                       final report = _reports[index];
                       return ListTile(
                         title: Text(report['name']),
-                        subtitle: Text('${report['date']} • \$${report['price'].toStringAsFixed(2)}'),
+                        subtitle: Text(
+                          'Maintenance: ${report['date'] ?? 'N/A'}'
+                          '\nReminder: ${report['reminder'] ?? '—'}'
+                          '\nPrice: \$${(report['price'] ?? 0).toStringAsFixed(2)}',
+                        ),
+                        isThreeLine: true,
                         onTap: () => _addOrEditReport(existing: report),
                         onLongPress: () async {
-                          await DbHelper().deleteReport(report['id']);
-                          _loadReports();
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text("Delete Report"),
+                              content: const Text("Are you sure you want to delete this report?"),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text("Cancel"),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text("Delete"),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await DbHelper().deleteReport(report['id']);
+                            _loadReports();
+                          }
                         },
                       );
                     },

@@ -20,16 +20,22 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // incremented version number
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE reports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             date TEXT,
+            reminder TEXT,
             price REAL
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async { // note to self use this when changing data base to add more columns
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE reports ADD COLUMN reminder TEXT');
+        }
       },
     );
   }

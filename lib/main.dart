@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'login.dart';
 import 'signup.dart';
 import 'home_screen.dart';
@@ -8,9 +10,29 @@ import 'profile_screen.dart';
 import 'reminder_screen.dart';
 import 'vehicle_screen.dart';
 
-void main() {
+// Create a global notification plugin instance
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize timezone
+  tz.initializeTimeZones();
+
+  // Android settings
+  const AndroidInitializationSettings androidSettings =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings initSettings =
+      InitializationSettings(android: androidSettings);
+
+  // Initialize notifications
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+
   runApp(const MyApp());
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -30,6 +52,8 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/maintenanceLog': (context) => const MaintenanceLog(),
         '/profileScreen': (context) => const ProfileScreen(),
+        '/reminderScreen': (context) => const MaintenanceLog(),
+        '/vehicleScreen': (context) => const MaintenanceLog(),
       },
     );
   }
