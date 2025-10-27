@@ -6,7 +6,6 @@ import 'splash.dart';
 import 'maintenance_log.dart';
 import 'profile_screen.dart';
 import 'reminder_screen.dart';
-import 'expense_screen.dart';
 import 'vehicle_screen.dart';
 
 void main() {
