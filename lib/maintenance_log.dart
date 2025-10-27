@@ -1,8 +1,54 @@
 import 'package:flutter/material.dart';
+import 'database_helper.dart';
 import 'main.dart';
 
-class MaintenanceLog extends StatelessWidget{
+class MaintenanceLog extends StatelessWidget {
   const MaintenanceLog({super.key});
+
+  Future<void> _addReport(BuildContext context) async {
+    final nameController = TextEditingController();
+    final dateController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Add New Card"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "Maintenance Report"),
+              ),
+              TextField(
+                controller: dateController,
+                decoration: const InputDecoration(labelText: "Date"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                final date = dateController.text.trim().isNotEmpty
+                    ? dateController.text.trim()
+                    : DateTime.now().toIso8601String();
+
+                await DbHelper().insertReport({
+                  'name': name,
+                  'date': date,
+                });
+
+                Navigator.pop(context);
+              },
+              child: const Text("Add"),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,13 +57,18 @@ class MaintenanceLog extends StatelessWidget{
         title: const Text('Maintenance Log'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Stack(
-
-        ),
+      body: const Center(
+        child: Text("No reports yet."),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addReport(context),
+        child: const Icon(Icons.add),
+      ),
       bottomNavigationBar: buildMyNavBar(context),
     );
   }
-Container buildMyNavBar(BuildContext context) {
+
+  Container buildMyNavBar(BuildContext context) {
     return Container(
       height: 60,
       decoration: BoxDecoration(
