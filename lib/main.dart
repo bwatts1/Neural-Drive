@@ -7,8 +7,6 @@ import 'home_screen.dart';
 import 'splash.dart';
 import 'maintenance_log.dart';
 import 'profile_screen.dart';
-import 'reminder_screen.dart';
-import 'vehicle_screen.dart';
 
 // Create a global notification plugin instance
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -52,8 +50,6 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/maintenanceLog': (context) => const MaintenanceLog(),
         '/profileScreen': (context) => const ProfileScreen(),
-        '/reminderScreen': (context) => const MaintenanceLog(),
-        '/vehicleScreen': (context) => const MaintenanceLog(),
       },
     );
   }

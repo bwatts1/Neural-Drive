@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'main.dart'; 
 import 'database_helper.dart';
 
 class MaintenanceLog extends StatefulWidget {
@@ -33,13 +36,38 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
       _total = total;
     });
   }
+  Future<void> _scheduleReminderNotification(
+      int id, String title, String reminderDate) async {
+    final reminder = DateTime.tryParse(reminderDate);
+    if (reminder == null) return;
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      id,
+      'Maintenance Reminder',
+      'It’s time for your maintenance: $title',
+      tz.TZDateTime.from(reminder, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'maintenance_channel',
+          'Maintenance Reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+      androidAllowWhileIdle: true,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.dateAndTime,
+    );
+  }
 
   Future<void> _addOrEditReport({Map<String, dynamic>? existing}) async {
     final nameController = TextEditingController(text: existing?['name']);
     final dateController = TextEditingController(
-        text: existing?['date'] ?? DateTime.now().toIso8601String().split('T').first);
-    final reminderController = TextEditingController(
-        text: existing?['reminder'] ?? '');
+        text: existing?['date'] ??
+            DateTime.now().toIso8601String().split('T').first);
+    final reminderController =
+        TextEditingController(text: existing?['reminder'] ?? '');
     final priceController = TextEditingController(
         text: existing != null ? existing['price'].toString() : '');
 
@@ -60,16 +88,20 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                 TextField(
                   controller: dateController,
                   readOnly: true,
-                  decoration: const InputDecoration(labelText: "Maintenance Date"),
+                  decoration:
+                      const InputDecoration(labelText: "Last Maintenance Date"),
                   onTap: () async {
                     DateTime? picked = await showDatePicker(
                       context: context,
-                      initialDate: DateTime.tryParse(dateController.text) ?? DateTime.now(),
+                      initialDate:
+                          DateTime.tryParse(dateController.text) ??
+                              DateTime.now(),
                       firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
                     );
                     if (picked != null) {
-                      dateController.text = picked.toIso8601String().split('T').first;
+                      dateController.text =
+                          picked.toIso8601String().split('T').first;
                     }
                   },
                 ),
@@ -77,17 +109,20 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                 TextField(
                   controller: reminderController,
                   readOnly: true,
-                  decoration: const InputDecoration(labelText: "Reminder Date"),
+                  decoration:
+                      const InputDecoration(labelText: "Reminder Date"),
                   onTap: () async {
                     DateTime? picked = await showDatePicker(
                       context: context,
-                      initialDate: DateTime.tryParse(reminderController.text) ??
-                          DateTime.now().add(const Duration(days: 7)),
+                      initialDate:
+                          DateTime.tryParse(reminderController.text) ??
+                              DateTime.now().add(const Duration(days: 7)),
                       firstDate: DateTime.now(),
                       lastDate: DateTime(2100),
                     );
                     if (picked != null) {
-                      reminderController.text = picked.toIso8601String().split('T').first;
+                      reminderController.text =
+                          picked.toIso8601String().split('T').first;
                     }
                   },
                 ),
@@ -110,7 +145,8 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
 
                 if (name.isEmpty || price == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter a valid name and price.")),
+                    const SnackBar(
+                        content: Text("Please enter a valid name and price.")),
                   );
                   return;
                 }
@@ -126,6 +162,14 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                   await DbHelper().insertReport(report);
                 } else {
                   await DbHelper().updateReport(existing['id'], report);
+                }
+
+                if (reminder.isNotEmpty) {
+                  await _scheduleReminderNotification(
+                    existing?['id'] ?? DateTime.now().millisecondsSinceEpoch,
+                    name,
+                    reminder,
+                  );
                 }
 
                 if (context.mounted) Navigator.pop(context);
@@ -156,20 +200,23 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
               children: [
                 TextField(
                     controller: keywordController,
-                    decoration: const InputDecoration(labelText: "Keyword")),
+                    decoration:
+                        const InputDecoration(labelText: "Keyword")),
                 TextField(
                     controller: minPriceController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "Min Price")),
+                    decoration:
+                        const InputDecoration(labelText: "Min Price")),
                 TextField(
                     controller: maxPriceController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "Max Price")),
+                    decoration:
+                        const InputDecoration(labelText: "Max Price")),
                 TextField(
                   controller: startDateController,
                   readOnly: true,
-                  decoration:
-                      const InputDecoration(labelText: "Start Date (YYYY-MM-DD)"),
+                  decoration: const InputDecoration(
+                      labelText: "Start Date (YYYY-MM-DD)"),
                   onTap: () async {
                     DateTime? picked = await showDatePicker(
                       context: context,
@@ -186,8 +233,8 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                 TextField(
                   controller: endDateController,
                   readOnly: true,
-                  decoration:
-                      const InputDecoration(labelText: "End Date (YYYY-MM-DD)"),
+                  decoration: const InputDecoration(
+                      labelText: "End Date (YYYY-MM-DD)"),
                   onTap: () async {
                     DateTime? picked = await showDatePicker(
                       context: context,
@@ -209,8 +256,10 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
               onPressed: () async {
                 final filtered = await DbHelper().filterReports(
                   keyword: keywordController.text.trim(),
-                  minPrice: double.tryParse(minPriceController.text.trim()),
-                  maxPrice: double.tryParse(maxPriceController.text.trim()),
+                  minPrice:
+                      double.tryParse(minPriceController.text.trim()),
+                  maxPrice:
+                      double.tryParse(maxPriceController.text.trim()),
                   startDate: startDateController.text.trim(),
                   endDate: endDateController.text.trim(),
                 );
@@ -231,7 +280,9 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
       appBar: AppBar(
         title: const Text('Maintenance Log'),
         actions: [
-          IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog),
+          IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _showFilterDialog),
         ],
       ),
       body: Column(
@@ -257,14 +308,17 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                             context: context,
                             builder: (_) => AlertDialog(
                               title: const Text("Delete Report"),
-                              content: const Text("Are you sure you want to delete this report?"),
+                              content: const Text(
+                                  "Are you sure you want to delete this report?"),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
                                   child: const Text("Cancel"),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, true),
+                                  onPressed: () =>
+                                      Navigator.pop(context, true),
                                   child: const Text("Delete"),
                                 ),
                               ],
@@ -284,7 +338,8 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
             alignment: Alignment.centerRight,
             child: Text(
               'Total: \$${_total.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
         ],
