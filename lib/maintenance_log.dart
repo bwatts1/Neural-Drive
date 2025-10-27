@@ -78,12 +78,58 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
     );
   }
 
+  Future<void> _showFilterDialog() async {
+    final keywordController = TextEditingController();
+    final minPriceController = TextEditingController();
+    final maxPriceController = TextEditingController();
+    final startDateController = TextEditingController();
+    final endDateController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Filter Reports"),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(controller: keywordController, decoration: const InputDecoration(labelText: "Keyword")),
+                TextField(controller: minPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Min Price")),
+                TextField(controller: maxPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Max Price")),
+                TextField(controller: startDateController, decoration: const InputDecoration(labelText: "Start Date (YYYY-MM-DD)")),
+                TextField(controller: endDateController, decoration: const InputDecoration(labelText: "End Date (YYYY-MM-DD)")),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final filtered = await DbHelper().filterReports(
+                  keyword: keywordController.text.trim(),
+                  minPrice: double.tryParse(minPriceController.text.trim()),
+                  maxPrice: double.tryParse(maxPriceController.text.trim()),
+                  startDate: startDateController.text.trim(),
+                  endDate: endDateController.text.trim(),
+                );
+                Navigator.pop(context);
+                _updateStateWithReports(filtered);
+              },
+              child: const Text("Apply"),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Maintenance Log'),
+        actions: [
+          IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog),
+        ],
       ),
       body: Column(
         children: [
