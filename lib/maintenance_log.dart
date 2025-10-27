@@ -2,8 +2,29 @@ import 'package:flutter/material.dart';
 import 'database_helper.dart';
 import 'main.dart';
 
-class MaintenanceLog extends StatelessWidget {
+class MaintenanceLog extends StatefulWidget {
   const MaintenanceLog({super.key});
+
+  @override
+  State<MaintenanceLog> createState() => _MaintenanceLogState();
+}
+
+class _MaintenanceLogState extends State<MaintenanceLog> {
+  List<Map<String, dynamic>> _reports = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
+
+  Future<void> _loadReports() async {
+    final db = await DbHelper().database;
+    final reports = await db.query('reports', orderBy: 'id DESC');
+    setState(() {
+      _reports = reports;
+    });
+  }
 
   Future<void> _addReport(BuildContext context) async {
     final nameController = TextEditingController();
@@ -13,7 +34,7 @@ class MaintenanceLog extends StatelessWidget {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text("Add New Card"),
+          title: const Text("Add New Report"),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -23,7 +44,7 @@ class MaintenanceLog extends StatelessWidget {
               ),
               TextField(
                 controller: dateController,
-                decoration: const InputDecoration(labelText: "Date"),
+                decoration: const InputDecoration(labelText: "Date (optional)"),
               ),
             ],
           ),
@@ -35,12 +56,11 @@ class MaintenanceLog extends StatelessWidget {
                     ? dateController.text.trim()
                     : DateTime.now().toIso8601String();
 
-                await DbHelper().insertReport({
-                  'name': name,
-                  'date': date,
-                });
-
-                Navigator.pop(context);
+                if (name.isNotEmpty) {
+                  await DbHelper().insertReport({'name': name, 'date': date});
+                  Navigator.pop(context);
+                  _loadReports();
+                }
               },
               child: const Text("Add"),
             ),
@@ -57,9 +77,18 @@ class MaintenanceLog extends StatelessWidget {
         title: const Text('Maintenance Log'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: const Center(
-        child: Text("No reports yet."),
-      ),
+      body: _reports.isEmpty
+          ? const Center(child: Text("No reports yet."))
+          : ListView.builder(
+              itemCount: _reports.length,
+              itemBuilder: (context, index) {
+                final report = _reports[index];
+                return ListTile(
+                  title: Text(report['name']),
+                  subtitle: Text(report['date']),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addReport(context),
         child: const Icon(Icons.add),

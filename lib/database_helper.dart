@@ -37,4 +37,9 @@ class DbHelper {
     final db = await database;
     return await db.insert('reports', report);
   }
+
+  Future<List<Map<String, dynamic>>> getReports() async {
+    final db = await database;
+    return await db.query('reports', orderBy: 'id DESC');
+  }
 }
