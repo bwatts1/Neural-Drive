@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
 import 'login.dart';
 import 'signup.dart';
 import 'home_screen.dart';
@@ -8,25 +9,40 @@ import 'splash.dart';
 import 'maintenance_log.dart';
 import 'profile_screen.dart';
 
-// Create a global notification plugin instance
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize timezone
   tz.initializeTimeZones();
 
-  // Android settings
   const AndroidInitializationSettings androidSettings =
       AndroidInitializationSettings('@mipmap/ic_launcher');
 
   const InitializationSettings initSettings =
       InitializationSettings(android: androidSettings);
 
-  // Initialize notifications
   await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+  const AndroidNotificationChannel maintenanceChannel = AndroidNotificationChannel(
+    'maintenance_channel', 
+    'Maintenance Reminders',
+    description: 'Notifications for scheduled maintenance tasks',
+    importance: Importance.max,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(maintenanceChannel);
+
+  final status = await Permission.notification.request();
+  if (status.isDenied) {
+    debugPrint('Notification permission denied by user.');
+  } else if (status.isPermanentlyDenied) {
+    debugPrint('Notification permission permanently denied.');
+  }
 
   runApp(const MyApp());
 }
@@ -49,7 +65,7 @@ class MyApp extends StatelessWidget {
         '/signUp': (context) => const SignUp(),
         '/home': (context) => const HomeScreen(),
         '/maintenanceLog': (context) => const MaintenanceLog(),
-        '/profileScreen': (context) => const MaintenanceLog(),
+        '/profileScreen': (context) => const ProfileScreen(), // ✅ fixed route
       },
     );
   }

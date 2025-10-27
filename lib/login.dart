@@ -57,7 +57,7 @@ class _LoginState extends State<Login> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => Navigator.of(context).pushNamed('/signUp'),
+              onPressed: () => Navigator.of(context).pushReplacementNamed('/signUp'),
               child: const Text("Don't have an account? Sign Up"),
             ),
           ],

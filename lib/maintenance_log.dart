@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'main.dart'; 
+import 'package:timezone/timezone.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
+import 'main.dart';
 import 'database_helper.dart';
 
 class MaintenanceLog extends StatefulWidget {
@@ -36,20 +37,32 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
       _total = total;
     });
   }
-  Future<void> _scheduleReminderNotification(
-      int id, String title, String reminderDate) async {
-    final reminder = DateTime.tryParse(reminderDate);
-    if (reminder == null) return;
+Future<void> _scheduleReminderNotification(
+    int id, String title, String reminderDate) async {
+  final reminder = DateTime.tryParse(reminderDate);
+  if (reminder == null) return;
 
+  // Request notification permission
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+    if (await Permission.notification.isDenied) return;
+  }
+
+  final tzReminder = tz.TZDateTime.from(reminder, tz.local);
+
+  try {
+    // Try scheduling normally
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id,
       'Maintenance Reminder',
       'It’s time for your maintenance: $title',
-      tz.TZDateTime.from(reminder, tz.local),
+      tzReminder,
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'maintenance_channel',
           'Maintenance Reminders',
+          channelDescription:
+              'Notifications to remind you of scheduled maintenance tasks.',
           importance: Importance.max,
           priority: Priority.high,
         ),
@@ -57,15 +70,38 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
       androidAllowWhileIdle: true,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dateAndTime,
+    );
+  } catch (e) {
+    // Fallback for devices where exact alarms are not allowed
+    debugPrint('Exact alarm not permitted, scheduling fallback: $e');
+
+    // Schedule a less precise notification by adding a few seconds buffer
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      id,
+      'Maintenance Reminder',
+      'It’s time for your maintenance: $title',
+      tzReminder.add(const Duration(seconds: 1)), // small buffer
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'maintenance_channel',
+          'Maintenance Reminders',
+          channelDescription:
+              'Notifications to remind you of scheduled maintenance tasks.',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+      androidAllowWhileIdle: true,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
+}
 
   Future<void> _addOrEditReport({Map<String, dynamic>? existing}) async {
     final nameController = TextEditingController(text: existing?['name']);
     final dateController = TextEditingController(
-        text: existing?['date'] ??
-            DateTime.now().toIso8601String().split('T').first);
+        text: existing?['date'] ?? DateTime.now().toIso8601String().split('T').first);
     final reminderController =
         TextEditingController(text: existing?['reminder'] ?? '');
     final priceController = TextEditingController(
@@ -94,14 +130,12 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                     DateTime? picked = await showDatePicker(
                       context: context,
                       initialDate:
-                          DateTime.tryParse(dateController.text) ??
-                              DateTime.now(),
+                          DateTime.tryParse(dateController.text) ?? DateTime.now(),
                       firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
                     );
                     if (picked != null) {
-                      dateController.text =
-                          picked.toIso8601String().split('T').first;
+                      dateController.text = picked.toIso8601String().split('T').first;
                     }
                   },
                 ),
@@ -114,9 +148,8 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                   onTap: () async {
                     DateTime? picked = await showDatePicker(
                       context: context,
-                      initialDate:
-                          DateTime.tryParse(reminderController.text) ??
-                              DateTime.now().add(const Duration(days: 7)),
+                      initialDate: DateTime.tryParse(reminderController.text) ??
+                          DateTime.now().add(const Duration(days: 7)),
                       firstDate: DateTime.now(),
                       lastDate: DateTime(2100),
                     );
@@ -165,12 +198,17 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
                 }
 
                 if (reminder.isNotEmpty) {
+                  final int notificationId = ((existing?['id'] ??
+                          DateTime.now().millisecondsSinceEpoch) % 2147483647)
+                      .toInt();
+
                   await _scheduleReminderNotification(
-                    existing?['id'] ?? DateTime.now().millisecondsSinceEpoch,
+                    notificationId,
                     name,
                     reminder,
                   );
                 }
+
 
                 if (context.mounted) Navigator.pop(context);
                 _loadReports();
@@ -200,18 +238,15 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
               children: [
                 TextField(
                     controller: keywordController,
-                    decoration:
-                        const InputDecoration(labelText: "Keyword")),
+                    decoration: const InputDecoration(labelText: "Keyword")),
                 TextField(
                     controller: minPriceController,
                     keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: "Min Price")),
+                    decoration: const InputDecoration(labelText: "Min Price")),
                 TextField(
                     controller: maxPriceController,
                     keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: "Max Price")),
+                    decoration: const InputDecoration(labelText: "Max Price")),
                 TextField(
                   controller: startDateController,
                   readOnly: true,
@@ -256,10 +291,8 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
               onPressed: () async {
                 final filtered = await DbHelper().filterReports(
                   keyword: keywordController.text.trim(),
-                  minPrice:
-                      double.tryParse(minPriceController.text.trim()),
-                  maxPrice:
-                      double.tryParse(maxPriceController.text.trim()),
+                  minPrice: double.tryParse(minPriceController.text.trim()),
+                  maxPrice: double.tryParse(maxPriceController.text.trim()),
                   startDate: startDateController.text.trim(),
                   endDate: endDateController.text.trim(),
                 );
@@ -281,8 +314,9 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
         title: const Text('Maintenance Log'),
         actions: [
           IconButton(
-              icon: const Icon(Icons.filter_list),
-              onPressed: _showFilterDialog),
+            icon: const Icon(Icons.filter_list),
+            onPressed: _showFilterDialog,
+          ),
         ],
       ),
       body: Column(
@@ -335,11 +369,11 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
           ),
           Container(
             padding: const EdgeInsets.all(16),
-            alignment: Alignment.centerRight,
+            alignment: Alignment.center,
             child: Text(
               'Total: \$${_total.toStringAsFixed(2)}',
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -347,6 +381,42 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addOrEditReport(),
         child: const Icon(Icons.add),
+      ),
+      bottomNavigationBar: buildMyNavBar(context),
+    );
+  }
+Container buildMyNavBar(BuildContext context) {
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.blue,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.book, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).pushReplacementNamed('/maintenanceLog');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.home, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).pushReplacementNamed('/home');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).pushReplacementNamed('/profileScreen');
+            },
+          ),
+        ],
       ),
     );
   }
