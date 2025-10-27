@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
-import 'main.dart';
 
 class MaintenanceLog extends StatefulWidget {
   const MaintenanceLog({super.key});
@@ -11,6 +10,7 @@ class MaintenanceLog extends StatefulWidget {
 
 class _MaintenanceLogState extends State<MaintenanceLog> {
   List<Map<String, dynamic>> _reports = [];
+  double _total = 0.0;
 
   @override
   void initState() {
@@ -19,50 +19,58 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
   }
 
   Future<void> _loadReports() async {
-    final db = await DbHelper().database;
-    final reports = await db.query('reports', orderBy: 'id DESC');
+    final reports = await DbHelper().getReports();
+    _updateStateWithReports(reports);
+  }
+
+  void _updateStateWithReports(List<Map<String, dynamic>> reports) {
+    double total = 0.0;
+    for (var r in reports) {
+      total += (r['price'] ?? 0).toDouble();
+    }
     setState(() {
       _reports = reports;
+      _total = total;
     });
   }
 
-  Future<void> _addReport(BuildContext context) async {
-    final nameController = TextEditingController();
-    final dateController = TextEditingController();
+  Future<void> _addOrEditReport({Map<String, dynamic>? existing}) async {
+    final nameController = TextEditingController(text: existing?['name']);
+    final dateController = TextEditingController(text: existing?['date']);
+    final priceController = TextEditingController(
+        text: existing != null ? existing['price'].toString() : '');
 
     await showDialog(
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text("Add New Report"),
+          title: Text(existing == null ? "Add Report" : "Edit Report"),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: "Maintenance Report"),
-              ),
-              TextField(
-                controller: dateController,
-                decoration: const InputDecoration(labelText: "Date (optional)"),
-              ),
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: "Name")),
+              TextField(controller: dateController, decoration: const InputDecoration(labelText: "Date")),
+              TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Price")),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () async {
                 final name = nameController.text.trim();
-                final date = dateController.text.trim().isNotEmpty
-                    ? dateController.text.trim()
-                    : DateTime.now().toIso8601String();
+                final date = dateController.text.trim().isNotEmpty ? dateController.text.trim() : DateTime.now().toIso8601String();
+                final price = double.tryParse(priceController.text.trim());
 
-                if (name.isNotEmpty) {
-                  await DbHelper().insertReport({'name': name, 'date': date});
+                if (name.isNotEmpty && price != null) {
+                  if (existing == null) {
+                    await DbHelper().insertReport({'name': name, 'date': date, 'price': price});
+                  } else {
+                    await DbHelper().updateReport(existing['id'], {'name': name, 'date': date, 'price': price});
+                  }
                   Navigator.pop(context);
                   _loadReports();
                 }
               },
-              child: const Text("Add"),
+              child: Text(existing == null ? "Add" : "Update"),
             ),
           ],
         );
@@ -70,65 +78,47 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Maintenance Log'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: _reports.isEmpty
-          ? const Center(child: Text("No reports yet."))
-          : ListView.builder(
-              itemCount: _reports.length,
-              itemBuilder: (context, index) {
-                final report = _reports[index];
-                return ListTile(
-                  title: Text(report['name']),
-                  subtitle: Text(report['date']),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _addReport(context),
-        child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: buildMyNavBar(context),
-    );
-  }
-
-  Container buildMyNavBar(BuildContext context) {
-    return Container(
-      height: 60,
-      decoration: BoxDecoration(
-        color: Colors.blue,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      body: Column(
         children: [
-          IconButton(
-            icon: const Icon(Icons.book, color: Colors.white),
-            onPressed: () {
-              Navigator.of(context).pushReplacementNamed('/maintenanceLog');
-            },
+          Expanded(
+            child: _reports.isEmpty
+                ? const Center(child: Text("No reports yet."))
+                : ListView.builder(
+                    itemCount: _reports.length,
+                    itemBuilder: (context, index) {
+                      final report = _reports[index];
+                      return ListTile(
+                        title: Text(report['name']),
+                        subtitle: Text('${report['date']} • \$${report['price'].toStringAsFixed(2)}'),
+                        onTap: () => _addOrEditReport(existing: report),
+                        onLongPress: () async {
+                          await DbHelper().deleteReport(report['id']);
+                          _loadReports();
+                        },
+                      );
+                    },
+                  ),
           ),
-          IconButton(
-            icon: const Icon(Icons.home, color: Colors.white),
-            onPressed: () {
-              Navigator.of(context).pushReplacementNamed('/home');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person, color: Colors.white),
-            onPressed: () {
-              Navigator.of(context).pushReplacementNamed('/profileScreen');
-            },
+          Container(
+            padding: const EdgeInsets.all(16),
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Total: \$${_total.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addOrEditReport(),
+        child: const Icon(Icons.add),
       ),
     );
   }
