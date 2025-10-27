@@ -20,8 +20,9 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 2, // incremented version number
+      version: 3, // bumped version for users table
       onCreate: (db, version) async {
+        // Reports table
         await db.execute('''
           CREATE TABLE reports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,15 +32,34 @@ class DbHelper {
             price REAL
           )
         ''');
+
+        // Users table
+        await db.execute('''
+          CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT
+          )
+        ''');
       },
-      onUpgrade: (db, oldVersion, newVersion) async { // note to self use this when changing data base to add more columns
+      onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE reports ADD COLUMN reminder TEXT');
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              username TEXT UNIQUE,
+              password TEXT
+            )
+          ''');
         }
       },
     );
   }
 
+  // ========== REPORT FUNCTIONS ==========
   Future<int> insertReport(Map<String, dynamic> report) async {
     final db = await database;
     return await db.insert('reports', report);
@@ -98,5 +118,31 @@ class DbHelper {
       whereArgs: whereArgs,
       orderBy: 'id DESC',
     );
+  }
+
+  // ========== USER FUNCTIONS ==========
+  Future<int> registerUser(String username, String password) async {
+    final db = await database;
+    try {
+      return await db.insert('users', {
+        'username': username,
+        'password': password,
+      });
+    } catch (e) {
+      // Username already exists
+      return -1;
+    }
+  }
+
+  Future<Map<String, dynamic>?> loginUser(
+      String username, String password) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'username = ? AND password = ?',
+      whereArgs: [username, password],
+    );
+    if (result.isNotEmpty) return result.first;
+    return null;
   }
 }

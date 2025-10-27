@@ -49,7 +49,7 @@ class MyApp extends StatelessWidget {
         '/signUp': (context) => const SignUp(),
         '/home': (context) => const HomeScreen(),
         '/maintenanceLog': (context) => const MaintenanceLog(),
-        '/profileScreen': (context) => const ProfileScreen(),
+        '/profileScreen': (context) => const MaintenanceLog(),
       },
     );
   }

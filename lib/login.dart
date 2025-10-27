@@ -1,9 +1,32 @@
 import 'package:flutter/material.dart';
-import 'signup.dart';
-import 'home_screen.dart';
+import 'database_helper.dart';
+import 'main.dart';
 
-class Login extends StatelessWidget{
+class Login extends StatefulWidget {
   const Login({super.key});
+
+  @override
+  State<Login> createState() => _LoginState();
+}
+
+class _LoginState extends State<Login> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  Future<void> _login() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    final user = await DbHelper().loginUser(username, password);
+
+    if (user != null) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid username or password")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,17 +35,33 @@ class Login extends StatelessWidget{
         title: const Text('Login'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Stack(
-        children: [
-          Center(
-            child: ElevatedButton(
-              onPressed: (){
-                    Navigator.of(context).pushReplacementNamed('/home');
-              },
-              child: const Text('Login'),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: _usernameController,
+              decoration: const InputDecoration(labelText: "Username"),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: "Password"),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _login,
+              child: const Text("Login"),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pushNamed('/signUp'),
+              child: const Text("Don't have an account? Sign Up"),
+            ),
+          ],
+        ),
       ),
     );
   }
