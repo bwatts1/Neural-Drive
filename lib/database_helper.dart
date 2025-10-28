@@ -20,16 +20,18 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 3, // bumped version for users table
+      version: 5, // 🔼 bump version to trigger upgrade
       onCreate: (db, version) async {
-        // Reports table
+        // Reports table (✅ includes vehicle_id now)
         await db.execute('''
           CREATE TABLE reports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER,
             name TEXT,
             date TEXT,
             reminder TEXT,
-            price REAL
+            price REAL,
+            FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL
           )
         ''');
 
@@ -39,6 +41,19 @@ class DbHelper {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT
+          )
+        ''');
+
+        // Vehicles table
+        await db.execute('''
+          CREATE TABLE vehicles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            userId INTEGER,
+            name TEXT,
+            make TEXT,
+            model TEXT,
+            year TEXT,
+            FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
           )
         ''');
       },
@@ -54,6 +69,23 @@ class DbHelper {
               password TEXT
             )
           ''');
+        }
+        if (oldVersion < 4) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS vehicles (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              userId INTEGER,
+              name TEXT,
+              make TEXT,
+              model TEXT,
+              year TEXT,
+              FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+            )
+          ''');
+        }
+        if (oldVersion < 5) {
+          // ✅ Add missing vehicle_id column to reports
+          await db.execute('ALTER TABLE reports ADD COLUMN vehicle_id INTEGER');
         }
       },
     );
@@ -144,5 +176,36 @@ class DbHelper {
     );
     if (result.isNotEmpty) return result.first;
     return null;
+  }
+
+  // ========== VEHICLE FUNCTIONS ==========
+  Future<int> insertVehicle(Map<String, dynamic> vehicle) async {
+    final db = await database;
+    return await db.insert('vehicles', vehicle);
+  }
+
+  Future<List<Map<String, dynamic>>> getUserVehicles(int userId) async {
+    final db = await database;
+    return await db.query(
+      'vehicles',
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'id DESC',
+    );
+  }
+
+  Future<int> updateVehicle(int id, Map<String, dynamic> vehicle) async {
+    final db = await database;
+    return await db.update('vehicles', vehicle, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteVehicle(int id) async {
+    final db = await database;
+    return await db.delete('vehicles', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getVehicles() async {
+    final db = await database;
+    return await db.query('vehicles');
   }
 }
