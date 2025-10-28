@@ -39,8 +39,19 @@ class _MaintenanceLogState extends State<MaintenanceLog> {
   }
 Future<void> _scheduleReminderNotification(
     int id, String title, String reminderDate) async {
-  final reminder = DateTime.tryParse(reminderDate);
+  final reminder = DateTime.tryParse(reminderDate.contains('T')
+      ? reminderDate
+      : '${reminderDate}T00:00:00');
   if (reminder == null) return;
+
+  // Calculate time difference
+  final diff = reminder.difference(DateTime.now());
+
+  // Skip if reminder date is in the past
+  if (diff.isNegative) {
+    debugPrint('Reminder date already passed, skipping notification.');
+    return;
+  }
 
   // Request notification permission
   if (await Permission.notification.isDenied) {
@@ -48,15 +59,13 @@ Future<void> _scheduleReminderNotification(
     if (await Permission.notification.isDenied) return;
   }
 
-  final tzReminder = tz.TZDateTime.from(reminder, tz.local);
-
   try {
-    // Try scheduling normally
+    // Schedule a delayed notification (based on duration difference)
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id,
       'Maintenance Reminder',
       'It’s time for your maintenance: $title',
-      tzReminder,
+      tz.TZDateTime.now(tz.local).add(diff),
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'maintenance_channel',
@@ -71,32 +80,14 @@ Future<void> _scheduleReminderNotification(
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
-  } catch (e) {
-    // Fallback for devices where exact alarms are not allowed
-    debugPrint('Exact alarm not permitted, scheduling fallback: $e');
 
-    // Schedule a less precise notification by adding a few seconds buffer
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
-      'Maintenance Reminder',
-      'It’s time for your maintenance: $title',
-      tzReminder.add(const Duration(seconds: 1)), // small buffer
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'maintenance_channel',
-          'Maintenance Reminders',
-          channelDescription:
-              'Notifications to remind you of scheduled maintenance tasks.',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    debugPrint(
+        'Reminder scheduled in ${diff.inSeconds} seconds for "$title"');
+  } catch (e) {
+    debugPrint('Failed to schedule notification: $e');
   }
 }
+
 
   Future<void> _addOrEditReport({Map<String, dynamic>? existing}) async {
     final nameController = TextEditingController(text: existing?['name']);
